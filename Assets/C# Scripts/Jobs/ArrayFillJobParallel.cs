@@ -3,16 +3,16 @@ using Unity.Collections;
 using Unity.Jobs;
 
 
-[BurstCompile(DisableSafetyChecks = true, OptimizeFor = OptimizeFor.Performance)]
-public struct IntArrayFillJobParallel : IJobParallelFor
+[BurstCompile(DisableSafetyChecks = true)]
+public struct ArrayFillJobParallel<T> : IJobParallelFor where T : unmanaged
 {
     [NativeDisableParallelForRestriction]
-    [WriteOnly][NoAlias] public NativeArray<int> array;
+    [WriteOnly][NoAlias] public NativeArray<T> array;
 
-    [WriteOnly][NoAlias] public int value;
+    [ReadOnly][NoAlias] public T value;
 
 
-    [BurstCompile(DisableSafetyChecks = true, OptimizeFor = OptimizeFor.Performance)]
+    [BurstCompile(DisableSafetyChecks = true)]
     public void Execute(int index)
     {
         array[index] = value;

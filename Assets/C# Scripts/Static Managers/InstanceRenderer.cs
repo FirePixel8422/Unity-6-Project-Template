@@ -30,7 +30,7 @@ public class InstanceRenderer
         UpdateScheduler.RegisterUpdate(OnUpdate);
     }
 
-    
+
     private void SetupMatrixData(Camera targetCamera)
     {
         int totalArraySize = perMeshArraySize * meshCount;
@@ -38,13 +38,13 @@ public class InstanceRenderer
         matrixKeys = new NativeArray<int>(totalArraySize, Allocator.Persistent);
         cellIdKeys = new NativeArray<int>(totalArraySize, Allocator.Persistent);
 
-        IntArrayFillJobParallel fillMatrixKeys = new IntArrayFillJobParallel()
+        ArrayFillJobParallel<int> fillMatrixKeys = new ArrayFillJobParallel<int>()
         {
             array = matrixKeys,
             value = -1,
         };
 
-        IntArrayFillJobParallel fillCellIdKeys = new IntArrayFillJobParallel()
+        ArrayFillJobParallel<int> fillCellIdKeys = new ArrayFillJobParallel<int>()
         {
             array = cellIdKeys,
             value = -1,
@@ -156,19 +156,19 @@ public class InstanceRenderer
             }
         }
 
-//#if UNITY_EDITOR
-//        if (perMeshArraySize > 100)
-//        {
-//            DebugLogger.LogWarning("Attempted to display DEBUG data for too large arrays, please lower the gridSize or disable the debug array display");
-//            return;
-//        }
+        //#if UNITY_EDITOR
+        //        if (perMeshArraySize > 100)
+        //        {
+        //            DebugLogger.LogWarning("Attempted to display DEBUG data for too large arrays, please lower the gridSize or disable the debug array display");
+        //            return;
+        //        }
 
-//        DEBUG_matrices = matrices.ToArray();
-//        DEBUG_matrixKeys = matrixKeys.ToArray();
-//        DEBUG_cellIdKeys = cellIdKeys.ToArray();
-//        DEBUG_matrixCounts = matrixCounts.ToArray();
-//        DEBUG_visibleMeshMatrices = culledInstanceMatrices.AsArray().ToArray();
-//#endif
+        //        DEBUG_matrices = matrices.ToArray();
+        //        DEBUG_matrixKeys = matrixKeys.ToArray();
+        //        DEBUG_cellIdKeys = cellIdKeys.ToArray();
+        //        DEBUG_matrixCounts = matrixCounts.ToArray();
+        //        DEBUG_visibleMeshMatrices = culledInstanceMatrices.AsArray().ToArray();
+        //#endif
     }
 
 
@@ -179,7 +179,7 @@ public class InstanceRenderer
     private void RenderMeshInstance(int meshId)
     {
         //render the instances of currentmesh
-        Graphics.RenderMeshInstanced(renderParams, meshes[meshId], 0, culledInstanceMatrices.AsArray());    
+        Graphics.RenderMeshInstanced(renderParams, meshes[meshId], 0, culledInstanceMatrices.AsArray());
     }
 
 
