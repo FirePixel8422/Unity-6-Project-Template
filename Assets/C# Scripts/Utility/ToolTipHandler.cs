@@ -1,7 +1,8 @@
+using Fire_Pixel.Utility;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UIElements;
+
 
 public class TooltipManager : MonoBehaviour
 {
@@ -26,8 +27,8 @@ public class TooltipManager : MonoBehaviour
     private bool updated;
 
 
-    public void OnEnable() => UpdateScheduler.RegisterUpdate(OnUpdate);
-    public void OnDisable() => UpdateScheduler.UnRegisterUpdate(OnUpdate);
+    public void OnEnable() => CallbackScheduler.RegisterUpdate(OnUpdate);
+    public void OnDisable() => CallbackScheduler.UnRegisterUpdate(OnUpdate);
 
     private void Start()
     {

@@ -1,3 +1,4 @@
+using Fire_Pixel.Utility;
 using TMPro;
 using UnityEngine;
 
@@ -17,8 +18,8 @@ public class LoadingTextAnimator : MonoBehaviour
         time = animationSpeed * 2;
     }
 
-    private void OnEnable() => UpdateScheduler.RegisterUpdate(OnUpdate);
-    private void OnDisable() => UpdateScheduler.RegisterUpdate(OnUpdate);
+    private void OnEnable() => CallbackScheduler.RegisterUpdate(OnUpdate);
+    private void OnDisable() => CallbackScheduler.RegisterUpdate(OnUpdate);
 
 
     private void OnUpdate()

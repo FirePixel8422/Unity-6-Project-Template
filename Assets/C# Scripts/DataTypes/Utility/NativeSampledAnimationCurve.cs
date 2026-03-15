@@ -42,7 +42,7 @@ public struct NativeSampledAnimationCurve
         }
         if (sampleCount == 2)
         {
-            DebugLogger.LogWarning("AnimationCurve has no data...");
+            DebugLogger.LogWarning("WHY THE FUCK IS SAMPLE COUNT 2!");
             return;
         }
 #endif

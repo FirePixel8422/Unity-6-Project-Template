@@ -1,3 +1,4 @@
+using Fire_Pixel.Utility;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
 using Unity.Jobs;
@@ -27,7 +28,7 @@ public class InstanceRenderer
 
         SetupMatrixData(targetCamera);
 
-        UpdateScheduler.RegisterUpdate(OnUpdate);
+        CallbackScheduler.RegisterUpdate(OnUpdate);
     }
 
 
@@ -252,7 +253,7 @@ public class InstanceRenderer
         culledInstanceMatrices.Dispose();
         frustumPlanes.Dispose();
 
-        UpdateScheduler.UnRegisterUpdate(OnUpdate);
+        CallbackScheduler.UnRegisterUpdate(OnUpdate);
     }
 
 

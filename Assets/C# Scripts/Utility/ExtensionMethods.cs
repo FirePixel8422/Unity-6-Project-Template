@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Fire_Pixel.Utility;
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -10,31 +12,29 @@ public static class ExtensionMethods
     #region Invoke
 
     /// <summary>
-    /// Call function after a delay
+    /// Invoke function <paramref name="f"/> after <paramref name="delay"/> seconds. Schedules a coroutine on the target <see cref="MonoBehaviour"/>
     /// </summary>
-    /// <param name="mb"></param>
-    /// <param name="f">Function to call.</param>
-    /// <param name="delay">Wait time before calling function.</param>
-    public static void Invoke(this MonoBehaviour mb, Action f, float delay)
+    /// <returns>The scheduled coroutine ref</returns>
+    public static InvokeCallbackReference Invoke(this MonoBehaviour mb, float delay, Action f)
     {
-        mb.StartCoroutine(InvokeRoutine(f, delay));
+        return CallbackScheduler.Invoke(delay, f, mb.GetInstanceID());
     }
-
-    public static void Invoke<T>(this MonoBehaviour mb, Action<T> f, T param, float delay)
+    /// <summary>
+    /// Stops a previously scheduled Invoke Callback on target (<see cref="MonoBehaviour"/>) and clears its reference.
+    /// Must be called on the same owner (<see cref="MonoBehaviour"/>) that started the coroutine.
+    /// </summary>
+    public static void CancelInvoke(this MonoBehaviour _, ref InvokeCallbackReference callbackRef)
     {
-        mb.StartCoroutine(InvokeRoutine(f, param, delay));
+        if (callbackRef == null) return;
+
+        CallbackScheduler.CancelInvoke(ref callbackRef);
     }
-
-    private static IEnumerator InvokeRoutine(Action f, float delay)
+    /// <summary>
+    /// Stops a previously scheduled Invoke Callback on <see cref="CallbackScheduler"/> and clears its reference.
+    /// </summary>
+    public static void CancelAllInvokes(this MonoBehaviour mb)
     {
-        yield return new WaitForSeconds(delay);
-        f.Invoke();
-    }
-
-    private static IEnumerator InvokeRoutine<T>(Action<T> f, T param, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        f.Invoke(param);
+        CallbackScheduler.CancelAllInvokesInGroup(mb.GetInstanceID());
     }
 
     #endregion
@@ -122,6 +122,29 @@ public static class ExtensionMethods
         return component != null;
     }
 
+    public static bool TryGetComponentInParentRecursively<T>(this Transform trans, bool checkStartTransform, out T component) where T : UnityEngine.Object
+    {
+        Transform current = checkStartTransform ? trans : trans.parent;
+
+        while (current != null)
+        {
+            if (current.TryGetComponent(out component))
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        component = null;
+        return false;
+    }
+
+    #endregion
+
+
+    #region (Try)FindObjectOfType
+
     public static bool TryFindObjectOfType<T>(this UnityEngine.Object obj, out T component, bool includeInactive = false) where T : UnityEngine.Object
     {
         FindObjectsInactive findObjectsInactive = includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude;
@@ -144,7 +167,7 @@ public static class ExtensionMethods
         return UnityEngine.Object.FindFirstObjectByType<T>();
     }
 
-    public static T[] FindObjectsOfType<T>(this UnityEngine.Object obj, bool includeInactive, bool sortByInstanceID = false) where T : UnityEngine.Object
+    public static T[] FindObjectsOfType<T>(this UnityEngine.Object obj, bool includeInactive = false, bool sortByInstanceID = false) where T : UnityEngine.Object
     {
         FindObjectsInactive findObjectsInactive = includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude;
         FindObjectsSortMode sortMode = sortByInstanceID ? FindObjectsSortMode.InstanceID : FindObjectsSortMode.None;
@@ -170,52 +193,6 @@ public static class ExtensionMethods
     public static bool HasComponentInParent<T>(this Transform trans, bool includeInactive = false) where T : Component
     {
         return trans.GetComponentInParent<T>(includeInactive) != null;
-    }
-
-    #endregion
-
-
-    #region DisposeIfCreated for Native Collections
-
-    /// <summary>
-    /// Check if the NativeArray is created, and if so, dispose of it
-    /// </summary>
-    public static void DisposeIfCreated<T>(this NativeArray<T> array) where T : unmanaged
-    {
-        if (array.IsCreated)
-            array.Dispose();
-    }
-    /// <summary>
-    /// Check if the NativeArray is created, and if so, dispose of it
-    /// </summary>
-    public static void DisposeIfCreated<T>(this NativeList<T> array) where T : unmanaged
-    {
-        if (array.IsCreated)
-            array.Dispose();
-    }
-    /// <summary>
-    /// Check if the NativeArray is created, and if so, dispose of it
-    /// </summary>
-    public static void DisposeIfCreated<T>(this NativeReference<T> array) where T : unmanaged
-    {
-        if (array.IsCreated)
-            array.Dispose();
-    }
-    /// <summary>
-    /// Check if the NativeArray is created, and if so, dispose of it
-    /// </summary>
-    public static void DisposeIfCreated<T>(this NativeHashSet<T> array) where T : unmanaged, IEquatable<T>
-    {
-        if (array.IsCreated)
-            array.Dispose();
-    }
-    /// <summary>
-    /// Check if the NativeArray is created, and if so, dispose of it
-    /// </summary>
-    public static void DisposeIfCreated<Tkey, TValue>(this NativeHashMap<Tkey, TValue> array) where Tkey : unmanaged, IEquatable<Tkey> where TValue : unmanaged
-    {
-        if (array.IsCreated)
-            array.Dispose();
     }
 
     #endregion
@@ -287,33 +264,53 @@ public static class ExtensionMethods
     #endregion
 
 
-
-    /// <returns>SurfaceType enum of the target collider, returns SurfaceType.None if there is no <see cref="SurfaceTypeIdentifier"/> attached to targetr collider</returns>
-    public static SurfaceType GetSurfaceType(this Collider collider)
-    {
-        if (collider.TryGetComponent(out SurfaceTypeIdentifier identifier))
-        {
-            return identifier.SurfaceType;
-        }
-        return SurfaceType.Metal;
-    }
+    #region DisposeIfCreated for Native Collections
 
     /// <summary>
-    /// Try finding an action by name, returns true if found, false if not. Outputs the found action
+    /// Check if the NativeArray is created, and if so, dispose of it
     /// </summary>
-    public static bool TryFindAction(this InputActionAsset actionAsset, string actionName, out InputAction action)
+    public static void DisposeIfCreated<T>(this NativeArray<T> array) where T : unmanaged
     {
-        action = actionAsset.FindAction(actionName);
-        return action != null;
+        if (array.IsCreated)
+            array.Dispose();
+    }
+    /// <summary>
+    /// Check if the NativeArray is created, and if so, dispose of it
+    /// </summary>
+    public static void DisposeIfCreated<T>(this NativeList<T> array) where T : unmanaged
+    {
+        if (array.IsCreated)
+            array.Dispose();
+    }
+    /// <summary>
+    /// Check if the NativeArray is created, and if so, dispose of it
+    /// </summary>
+    public static void DisposeIfCreated<T>(this NativeReference<T> array) where T : unmanaged
+    {
+        if (array.IsCreated)
+            array.Dispose();
+    }
+    /// <summary>
+    /// Check if the NativeArray is created, and if so, dispose of it
+    /// </summary>
+    public static void DisposeIfCreated<T>(this NativeHashSet<T> array) where T : unmanaged, IEquatable<T>
+    {
+        if (array.IsCreated)
+            array.Dispose();
+    }
+    /// <summary>
+    /// Check if the NativeArray is created, and if so, dispose of it
+    /// </summary>
+    public static void DisposeIfCreated<Tkey, TValue>(this NativeHashMap<Tkey, TValue> array) where Tkey : unmanaged, IEquatable<Tkey> where TValue : unmanaged
+    {
+        if (array.IsCreated)
+            array.Dispose();
     }
 
-    /// <summary>
-    /// Assign value <typeparamref name="T"/> to ref of captured variable (use this to write back to arrays)
-    /// </summary>
-    public static void AssignValueToRef<T>(this ref T target, T value) where T : unmanaged
-    {
-        target = value;
-    }
+    #endregion
+
+
+    #region Array/List/NativeCollection Shuffle
 
     /// <summary>
     /// Randomly shuffles the content of the array in place using Fisher–Yates.
@@ -327,15 +324,213 @@ public static class ExtensionMethods
             (targetArray[i], targetArray[j]) = (targetArray[j], targetArray[i]);
         }
     }
+    /// <summary>
+    /// Randomly shuffles the content of the array in place using Fisher–Yates.
+    /// </summary>
+    public static void Shuffle<T>(this List<T> targetArray)
+    {
+        int n = targetArray.Count;
+        for (int i = 0; i < n - 1; i++)
+        {
+            int j = UnityEngine.Random.Range(i, n);
+            (targetArray[i], targetArray[j]) = (targetArray[j], targetArray[i]);
+        }
+    }
+    /// <summary>
+    /// Randomly shuffles the content of the array in place using Fisher–Yates.
+    /// </summary>
+    public static void Shuffle<T>(this NativeArray<T> targetArray) where T : unmanaged
+    {
+        int n = targetArray.Length;
+        for (int i = 0; i < n - 1; i++)
+        {
+            int j = UnityEngine.Random.Range(i, n);
+            (targetArray[i], targetArray[j]) = (targetArray[j], targetArray[i]);
+        }
+    }
+    /// <summary>
+    /// Randomly shuffles the content of the array in place using Fisher–Yates.
+    /// </summary>
+    public static void Shuffle<T>(this NativeList<T> targetArray) where T : unmanaged
+    {
+        int n = targetArray.Length;
+        for (int i = 0; i < n - 1; i++)
+        {
+            int j = UnityEngine.Random.Range(i, n);
+            (targetArray[i], targetArray[j]) = (targetArray[j], targetArray[i]);
+        }
+    }
+
+    #endregion
+
+
+    #region Index Modify Utility
 
     /// <summary>
-    /// Replaces the element at <paramref name="targetId"/> with the element at <paramref name="backId"/>, 
-    /// then clears the element at <paramref name="backId"/> by assigning <paramref name="nullValue"/>.
-    /// Useful for implementing a swap-back removal in fixed-size arrays.
+    /// Increments index by 1 and wraps to 0 if it reaches length
     /// </summary>
-    public static void RemoveAtSwapBack<T>(this T[] targetArray, int targetId, int backId, T nullValue = default)
+    public static int IncrementSmart(this ref int value, int length)
     {
-        targetArray[targetId] = targetArray[backId];
-        targetArray[backId] = nullValue;
+        value += 1;
+        if (value >= length)
+        {
+            value = 0;
+        }
+        return value;
+    }
+    /// <summary>
+    /// Decrements index by 1 and wraps to length if it reaches 0
+    /// </summary>
+    public static int DecrementSmart(this ref int value, int length)
+    {
+        value -= 1;
+        if (value < 0)
+        {
+            value = length - 1;
+        }
+        return value;
+    }
+
+    /// <summary>
+    /// Updates index by adding <paramref name="toAdd"/> and wraps to 0 if it reaches length or length if it reaches 0
+    /// </summary>
+    public static int AddSmart(this ref int value, int toAdd, int length)
+    {
+        DebugLogger.Throw("AddSmart called with length 0", length <= 0);
+
+        value += toAdd;
+        while (value >= length)
+        {
+            value -= length;
+        }
+        while (value < 0)
+        {
+            value += length;
+        }
+        return value;
+    }
+
+    #endregion
+
+
+    #region Array Utility
+
+    /// <summary>
+    /// Selects and returns a random entry of array.
+    /// </summary>
+    public static T SelectRandom<T>(this T[] targetArray)
+    {
+        return targetArray[UnityEngine.Random.Range(0, targetArray.Length)];
+    }
+
+    /// <summary>
+    /// Selects and returns a random array filled with entries of <paramref name="targetArray"/>
+    /// </summary>
+    public static T[] SelectRandomRange<T>(this T[] targetArray, int entryCount, bool forceUniqueEntries = true)
+    {
+        T[] output = new T[entryCount];
+
+        if (forceUniqueEntries)
+        {
+            List<int> numberPot = new List<int>(entryCount);
+            for (int i = 0; i < targetArray.Length; i++)
+            {
+                numberPot.Add(i);
+            }
+
+            int r;
+            for (int i = 0; i < entryCount; i++)
+            {
+                r = UnityEngine.Random.Range(0, numberPot.Count);
+
+                output[i] = targetArray[numberPot[r]];
+
+                numberPot.RemoveAt(r);
+            }
+        }
+        else
+        {
+            int r;
+            for (int i = 0; i < entryCount; i++)
+            {
+                r = UnityEngine.Random.Range(0, entryCount);
+
+                output[i] = targetArray[r];
+            }
+        }
+        return output;
+    }
+
+    /// <summary>
+    /// Modifies a struct element in a list safely by copying, running the modifier, then writing it back.
+    /// </summary>
+    public static void ModifyAt<T>(this List<T> list, int index, ActionRef<T> modifier) where T : struct
+    {
+        T copy = list[index];
+        modifier(ref copy);
+        list[index] = copy;
+    }
+    public delegate void ActionRef<T>(ref T value);
+
+
+    /// <returns>Wheather array is valid and has at least 1 entry</returns>
+    public static bool HasData<T>(this T[] array)
+    {
+        return array != null && array.Length > 0;
+    }
+    /// <returns>Wheather array is invalid or its length is 0</returns>
+    public static bool IsNullOrEmpty<T>(this T[] array)
+    {
+        return array == null || array.Length == 0;
+    }
+    /// <returns>Wheather array is invalid or its length is 0</returns>
+    public static bool IsNotNullOrEmpty<T>(this T[] array)
+    {
+        return array != null && array.Length != 0;
+    }
+    /// <returns>Wheather array is invalid or its length is 0 or it has null at one of its entries</returns>
+    public static bool HasInvalidData<T>(this T[] array)
+    {
+        bool arrayValid = array != null && array.Length > 0;
+        if (arrayValid)
+        {
+            int count = array.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (array[i] == null)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    /// <returns>Wheather array is valid or its length is more then 0 and it has no null at none of its entries</returns>
+    public static bool HasNoInvalidData<T>(this T[] array)
+    {
+        bool arrayValid = array != null && array.Length > 0;
+        if (arrayValid)
+        {
+            int count = array.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (array[i] == null)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Try finding an action by name, returns true if found, false if not. Outputs the found action
+    /// </summary>
+    public static bool TryFindAction(this InputActionAsset actionAsset, string actionName, out InputAction action)
+    {
+        action = actionAsset.FindAction(actionName);
+        return action != null;
     }
 }

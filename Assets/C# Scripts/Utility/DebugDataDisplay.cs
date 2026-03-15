@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using Fire_Pixel.Utility;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -45,13 +46,13 @@ public class DebugDataDisplay : MonoBehaviour
 
     private void OnEnable()
     {
-        UpdateScheduler.RegisterUpdate(OnUpdate);
+        CallbackScheduler.RegisterUpdate(OnUpdate);
         ReloadExpensiveStats(); // Initial load of expensive stats
     }
 
     private void OnDisable()
     {
-        UpdateScheduler.UnRegisterUpdate(OnUpdate);
+        CallbackScheduler.UnRegisterUpdate(OnUpdate);
     }
 
     private void OnUpdate()
